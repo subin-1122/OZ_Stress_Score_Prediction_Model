@@ -23,7 +23,9 @@ stress_predic_DACON/
 │   ├── experiment_v8_no_work_correction_diagnostic.py
 │   ├── experiment_v9_alpha090_public_check.py
 │   ├── experiment_v10_alpha_fine_compare.py
-│   └── experiment_v11_alpha0930_public_probe.py
+│   ├── experiment_v11_alpha0930_public_probe.py
+│   ├── experiment_v12_alpha_ensemble.py
+│   └── experiment_v13_link_top2_blend.py
 ├── open (3)/                  # DACON 데이터, Git 제외
 ├── outputs/                   # 예측값과 제출 파일, Git 제외
 ├── requirements.txt
@@ -89,6 +91,8 @@ outputs/experimental_alpha093_link_snap_metrics.json
 | v8 | mean_working 보정 제거 | 약 0.12082 | 0.12928 | 보정 효과 확인 |
 | v9 | mean_working alpha=0.900 | 약 0.11843 | 0.12558 | 채택 |
 | v11 | mean_working alpha=0.930 | 약 0.11847 | **0.1255266667** | 현재 최고 Public |
+| v12 | alpha 0.75~0.90 평균 | 약 0.11847 | 미제출 | 5/5 seed 악화로 기각 |
+| v13 | 연결 후보 top1/top2 블렌딩 | 개선 없음 | 미제출 | 5/5 seed 무승부로 기각 |
 
 ### OOF와 Public의 차이
 
@@ -107,6 +111,8 @@ outputs/experimental_alpha093_link_snap_metrics.json
 - `experiment_v9_alpha090_public_check.py`: alpha=0.900 제출
 - `experiment_v10_alpha_fine_compare.py`: alpha=0.750~1.000 세밀 비교
 - `experiment_v11_alpha0930_public_probe.py`: 현재 최고 Public 제출
+- `experiment_v12_alpha_ensemble.py`: alpha 0.75/0.80/0.85/0.90 예측 평균 검증
+- `experiment_v13_link_top2_blend.py`: 애매한 연결행의 1위·2위 후보 블렌딩 검증
 
 ## 누수 방지 원칙
 
@@ -120,4 +126,10 @@ outputs/experimental_alpha093_link_snap_metrics.json
 
 ## 다음 실험
 
-현재 Public 결과를 기준으로 `alpha=0.950`부터 더 강한 보정을 순차적으로 확인할 예정입니다. 한 번에 여러 Public 결과를 보고 최적값을 고르는 선택 편향을 줄이기 위해, 제출 전 alpha와 다음 행동 기준을 먼저 정해두고 기록합니다.
+Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 계획은 중단했습니다. 내부 검증에서 0.92 이상은 deterministic split seed 5개가 모두 악화했기 때문에, 추가 leaderboard 탐색보다 OOF에서 독립적으로 재현되는 새 신호만 검토합니다.
+
+### 종료한 방향
+
+- alpha 0.75/0.80/0.85/0.90 평균은 alpha=0.75보다 OOF MAE가 0.0000667 나빴고 5개 seed가 모두 악화했습니다.
+- 고신뢰 learned 연결행은 OOF에서 top1 정답 일치율이 100%였습니다. 2위 후보는 정답인 경우가 없어서 nested 검증이 모든 fold에서 변경하지 않음을 선택했습니다.
+- 두 실험 모두 사전 기준인 전체 OOF 0.0001 이상 개선과 5/5 seed 개선을 통과하지 못했으므로 제출 파일을 만들지 않았습니다.
