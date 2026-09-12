@@ -36,7 +36,8 @@ stress_predic_DACON/
 │   ├── experiment_v20_gam_work_alpha.py
 │   ├── experiment_v21_distributional_median.py
 │   ├── experiment_v22_symbolic_residual.py
-│   └── experiment_v23_pure_extratrees_snap.py
+│   ├── experiment_v23_pure_extratrees_snap.py
+│   └── experiment_v24_nested_simplex_stacking.py
 ├── open (3)/                  # DACON 데이터, Git 제외
 ├── outputs/                   # 예측값과 제출 파일, Git 제외
 ├── requirements.txt
@@ -113,7 +114,8 @@ outputs/experimental_alpha093_link_snap_metrics.json
 | v15 | TabPFN 회귀 | 미실행 | 미제출 | 사용자 결정으로 중단 |
 | v21 | Ordinal 중앙값·forest proximity | 최선 약 0.000080 개선 | 미제출 | 기준 미달 및 seed 불안정 |
 | v22 | gplearn symbolic 잔차 보정 | 최소 0.000231 악화 | 미제출 | 5/5 seed 악화 |
-| v23 | 순수 3-seed ExtraTrees + snap | 0.1221033 | 결과 확인 대기 | 연결 효과 분리용 진단 제출 |
+| v23 | 순수 3-seed ExtraTrees + snap | 0.1221033 | 0.12956 | 연결 제거 시 실제 성능 악화 확인 |
+| v24 | 10개 OOF 후보 nested simplex stacking | 최선 0.1184800 | 미제출 | 5/5 seed 악화로 기각 |
 
 ### OOF와 Public의 차이
 
@@ -145,6 +147,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 - `experiment_v21_distributional_median.py`: 101-class 조건부 중앙값과 forest-proximity 중앙값 선별
 - `experiment_v22_symbolic_residual.py`: 미연결 행의 post-mean_working 잔차를 symbolic 식으로 보정
 - `experiment_v23_pure_extratrees_snap.py`: 연결·잔차 보정을 제거한 순수 ExtraTrees 진단 제출 재현
+- `experiment_v24_nested_simplex_stacking.py`: 기존 10개 OOF 예측을 train-only nested CV에서 비음수·합 1 가중치로 스태킹
 
 ## 누수 방지 원칙
 
@@ -160,7 +163,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 
 Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 계획은 중단했습니다. 내부 검증에서 0.92 이상은 deterministic split seed 5개가 모두 악화했기 때문에, 추가 leaderboard 탐색보다 OOF에서 독립적으로 재현되는 새 신호만 검토합니다.
 
-이번 라운드의 새 모델 후보 중 기존 파이프라인을 안정적으로 이긴 방법은 없었습니다. 별도로 레코드 연결의 실제 Public 전이 효과를 분리하기 위해 순수 ExtraTrees 진단 제출을 만들었습니다.
+이번 라운드의 새 모델 후보 중 기존 파이프라인을 안정적으로 이긴 방법은 없었습니다. 레코드 연결 효과를 분리한 순수 ExtraTrees 진단 제출은 Public 0.12956으로, 현재 최종 파이프라인보다 약 0.00403 나빴습니다.
 
 ### 상세 판단
 
@@ -174,8 +177,9 @@ Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 �
 - ID 인접성은 바로 옆 ID의 target 차이가 0.3349로 무작위 쌍의 0.3324보다 낫지 않았고, train-test 동일 번호의 feature 일치 수도 무작위와 차이가 없어서 blocking에 사용하지 않았습니다.
 - 101-class 조건부 중앙값의 최선은 평균 0.000080 개선에 그쳤고 4승 1패였습니다. forest-proximity 중앙값은 최선 조합도 평균 0.000124 악화했습니다.
 - gplearn 잔차 보정은 가장 약한 alpha=0.25에서도 평균 0.000231 악화했고 5개 연결 seed가 모두 악화했습니다. fold별 수식도 대부분 상수 또는 단일 항으로 수렴했습니다.
-- 순수 3-seed ExtraTrees의 raw OOF는 0.1221729이고 0.01 snapping 후에는 0.1221033입니다. 과거 단순 모델 gap 0.002422를 기계적으로 더한 0.1245253은 참고용 추정일 뿐 실제 점수를 보장하지 않습니다.
+- 순수 3-seed ExtraTrees의 raw OOF는 0.1221729이고 0.01 snapping 후에는 0.1221033입니다. 실제 Public은 0.12956으로 gap은 약 0.0074567이었으며, 연결·보정 파이프라인이 Public에서도 약 0.00403 우수했습니다.
 - 연결 threshold 0.98은 0.97에서 정확했던 7행을 제외했고, 전체 파이프라인 OOF를 모든 seed에서 0.0001167 악화시켜 기각했습니다.
+- 기존 10개 모델 OOF를 한꺼번에 결합한 nested simplex stacking은 base 모델 비중을 최소 90%로 제한한 가장 보수적 조합도 OOF 0.1184800으로 기존보다 0.0000813 나빴고, 5개 연결 seed가 모두 악화해 기각했습니다.
 - 따라서 현재 유지할 조합은 **고신뢰 레코드 연결 + mean_working 보정 + 0.01 snapping**이며, 최고 Public 제출은 alpha=0.930의 0.1255266667입니다.
 
 ### 선택 실험 의존성
