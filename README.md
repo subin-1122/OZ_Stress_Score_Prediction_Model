@@ -25,10 +25,19 @@ stress_predic_DACON/
 │   ├── experiment_v10_alpha_fine_compare.py
 │   ├── experiment_v11_alpha0930_public_probe.py
 │   ├── experiment_v12_alpha_ensemble.py
-│   └── experiment_v13_link_top2_blend.py
+│   ├── experiment_v13_link_top2_blend.py
+│   ├── experiment_v14_component_dedup.py
+│   ├── experiment_v15_tabpfn_regression.py
+│   ├── experiment_v16_gam_quantile.py
+│   ├── experiment_v17_gam_independent_confirm.py
+│   ├── experiment_v18_gam_full_pipeline_eval.py
+│   ├── experiment_v18b_gam_layer_diagnostic.py
+│   ├── experiment_v19_deterministic_union_audit.py
+│   └── experiment_v20_gam_work_alpha.py
 ├── open (3)/                  # DACON 데이터, Git 제외
 ├── outputs/                   # 예측값과 제출 파일, Git 제외
 ├── requirements.txt
+├── requirements-tabpfn.txt    # TabPFN 선택 설치 환경
 └── .vscode/settings.json
 ```
 
@@ -93,6 +102,11 @@ outputs/experimental_alpha093_link_snap_metrics.json
 | v11 | mean_working alpha=0.930 | 약 0.11847 | **0.1255266667** | 현재 최고 Public |
 | v12 | alpha 0.75~0.90 평균 | 약 0.11847 | 미제출 | 5/5 seed 악화로 기각 |
 | v13 | 연결 후보 top1/top2 블렌딩 | 개선 없음 | 미제출 | 5/5 seed 무승부로 기각 |
+| v14 | 중복 그룹 가중치/대표행 학습 | 약 0.13559~0.13566 | 미제출 | 개선이 작고 seed별 불안정 |
+| v16~v17 | Quantile GAM, 독립 seed 재검증 | 최대 약 0.00120 개선 | 미제출 | 예비 검증 통과 |
+| v18~v20 | GAM을 전체 파이프라인에 결합 | 최선 약 0.11850 | 미제출 | 기존 0.11840보다 악화 |
+| v19 | deterministic union 보수적 규칙 | 최대 약 0.000085 개선 | 미제출 | 사전 기준 0.0001 미달 |
+| v15 | TabPFN 회귀 | 실행 대기 | 미제출 | 로컬 라이선스 인증 필요 |
 
 ### OOF와 Public의 차이
 
@@ -113,6 +127,14 @@ outputs/experimental_alpha093_link_snap_metrics.json
 - `experiment_v11_alpha0930_public_probe.py`: 현재 최고 Public 제출
 - `experiment_v12_alpha_ensemble.py`: alpha 0.75/0.80/0.85/0.90 예측 평균 검증
 - `experiment_v13_link_top2_blend.py`: 애매한 연결행의 1위·2위 후보 블렌딩 검증
+- `experiment_v14_component_dedup.py`: 유사 레코드 그룹의 역가중치 및 대표행 학습 검증
+- `experiment_v15_tabpfn_regression.py`: train-only 인코딩을 사용하는 TabPFN 5-fold OOF 실험
+- `experiment_v16_gam_quantile.py`: Quantile GAM과 ExtraTrees 블렌딩 예비 스크리닝
+- `experiment_v17_gam_independent_confirm.py`: 고정한 GAM 조합을 새 seed와 20-fold로 재검증
+- `experiment_v18_gam_full_pipeline_eval.py`: GAM을 기존 100-fold 연결·보정·snapping 파이프라인에 결합
+- `experiment_v18b_gam_layer_diagnostic.py`: GAM 효과가 어느 보정 단계에서 사라지는지 분리 진단
+- `experiment_v19_deterministic_union_audit.py`: deterministic 연결 규칙을 더 엄격하게 재검증
+- `experiment_v20_gam_work_alpha.py`: GAM 결합 후 mean_working alpha를 0.00~1.00으로 재탐색
 
 ## 누수 방지 원칙
 
@@ -124,12 +146,31 @@ outputs/experimental_alpha093_link_snap_metrics.json
 
 레코드 연결 방식은 대회 운영진 문의 후 사용 가능한 방법이라는 답변을 확인하고 실험했습니다.
 
-## 다음 실험
+## 최신 추가 실험 결론
 
 Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 계획은 중단했습니다. 내부 검증에서 0.92 이상은 deterministic split seed 5개가 모두 악화했기 때문에, 추가 leaderboard 탐색보다 OOF에서 독립적으로 재현되는 새 신호만 검토합니다.
 
-### 종료한 방향
+이번 라운드에서 중복 그룹 가중치, Quantile GAM, deterministic union 규칙 재점검을 진행했습니다. 최종적으로 기존 파이프라인을 안정적으로 이긴 후보는 없었으며, 새 제출 파일도 생성하지 않았습니다.
+
+### 상세 판단
 
 - alpha 0.75/0.80/0.85/0.90 평균은 alpha=0.75보다 OOF MAE가 0.0000667 나빴고 5개 seed가 모두 악화했습니다.
 - 고신뢰 learned 연결행은 OOF에서 top1 정답 일치율이 100%였습니다. 2위 후보는 정답인 경우가 없어서 nested 검증이 모든 fold에서 변경하지 않음을 선택했습니다.
-- 두 실험 모두 사전 기준인 전체 OOF 0.0001 이상 개선과 5/5 seed 개선을 통과하지 못했으므로 제출 파일을 만들지 않았습니다.
+- 중복 그룹 역가중치는 평균 0.0000117만 개선했고 3승 2패였습니다. 대표행만 남긴 학습은 평균 0.0000573 악화했습니다.
+- Quantile GAM은 작은 10/20-fold 검증에서는 모든 seed가 개선했지만, 실제 기준과 같은 100-fold 파이프라인에서는 평균 0.0001367 악화했습니다.
+- GAM은 raw unlinked 예측에서 0.002029 개선했지만, `mean_working` 보정 뒤에는 0.0001929 악화했습니다. 두 방법이 같은 잔차 신호를 겹쳐 고친다는 근거입니다.
+- GAM 결합 상태에서 `mean_working` alpha를 다시 찾은 최선은 0.65였지만 OOF 0.1185007로, 기존 0.1183987보다 0.000102 나빴습니다.
+- 더 엄격한 deterministic 연결은 learned-only 기준 최대 약 0.0000847 개선했지만 사전 채택 기준 0.0001에 못 미쳤고, 현재 규칙보다 실질 개선은 약 0.0000033뿐이었습니다.
+- 따라서 현재 유지할 조합은 **고신뢰 레코드 연결 + mean_working 보정 + 0.01 snapping**이며, 최고 Public 제출은 alpha=0.930의 0.1255266667입니다.
+
+### TabPFN 실행 방법
+
+TabPFN 코드는 준비했지만 Prior Labs의 무료 라이선스 동의와 개인 API 토큰이 필요해 자동 실행하지 않았습니다. 토큰은 Git이나 코드에 저장하지 말고 현재 터미널의 환경변수로만 전달합니다.
+
+```bash
+python -m pip install -r requirements-tabpfn.txt
+export TABPFN_TOKEN="<본인의 Prior Labs 토큰>"
+.venv/bin/python experiment/experiment_v15_tabpfn_regression.py
+```
+
+TabPFN도 동일하게 train fold에서만 전처리를 학습하고 held-out fold로 검증하도록 작성했습니다.
