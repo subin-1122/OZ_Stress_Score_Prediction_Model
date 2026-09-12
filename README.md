@@ -40,7 +40,8 @@ stress_predic_DACON/
 │   ├── experiment_v24_nested_simplex_stacking.py
 │   ├── experiment_v25_mae_aware_linkage.py
 │   ├── experiment_v26_structured_work_residual.py
-│   └── experiment_v27_missingness_residual.py
+│   ├── experiment_v27_missingness_residual.py
+│   └── experiment_v28_corruption_pattern_linkage.py
 ├── open (3)/                  # DACON 데이터, Git 제외
 ├── outputs/                   # 예측값과 제출 파일, Git 제외
 ├── requirements.txt
@@ -122,6 +123,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 | v25 | MAE-aware pair ranking + nested gate | 평균 0.1184536 | 미제출 | 4승 2무 19패로 기각 |
 | v26 | 구조화된 mean_working 잔차 보정 | 고정 비교 최선 0.1183007 | 미제출 | 3승 2패, nested 3승 22패로 기각 |
 | v27 | 결측 signature 계층 보정 | 평균 0.1184300 | 미제출 | 0승 5무 20패로 기각 |
+| v28 | corruption-pattern likelihood 연결 | 평균 0.1185175 | 미제출 | 7승 2무 16패로 기각 |
 
 ### OOF와 Public의 차이
 
@@ -157,6 +159,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 - `experiment_v25_mae_aware_linkage.py`: 확장 후보의 복사 MAE를 직접 예측하고 별도 nested gate로 적용 여부를 검증
 - `experiment_v26_structured_work_residual.py`: 근로시간 local smoothing과 예측구간 계층 보정을 안팎 교차검증으로 비교
 - `experiment_v27_missingness_residual.py`: 4개 결측 열의 개수·signature별 shrinkage 잔차 보정을 안팎 교차검증으로 비교
+- `experiment_v28_corruption_pattern_linkage.py`: 고신뢰 중복쌍의 열별·공동 변형 확률비로 확장 후보를 연결하고 nested calibration으로 검증
 
 ## 누수 방지 원칙
 
@@ -193,6 +196,7 @@ Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 �
 - v25의 oracle 상한이 0.11823으로 크게 나온 것은 행당 평균 약 536개 후보와 101개뿐인 target 격자 때문에 같은 점수가 우연히 후보군에 포함된 결과입니다. 이 값은 실제로 식별 가능한 연결 신호가 아니므로 모델 채택 근거로 사용하지 않습니다.
 - 근로시간 local smoothing과 `mean_working × 예측구간` 계층 보정의 100-fold 고정 비교 최선은 평균 0.000098 개선에 그쳤고 3승 2패였습니다. 방식과 강도를 fold 밖에서 고른 nested 검증에서는 평균 0.0004115 악화하고 3승 22패여서 선택 편향으로 판단했습니다.
 - 결측 개수·4-bit signature 보정은 100-fold 고정 비교 최선도 평균 0.0000587 악화했습니다. nested 검증에서는 평균 0.0000313 악화, 0승 5무 20패였고 250개 outer fold 중 no-op이 223번 선택되어 결측 패턴 신호를 기각했습니다.
+- corruption-pattern likelihood는 fold마다 약 584~624개 고신뢰 positive 쌍으로 열별·공동 equality 패턴을 학습했지만, nested calibration 결과 평균 0.0001188 악화하고 7승 2무 16패였습니다. 실제 변경은 평균 3.7행뿐이어서 확장 후보에서 새 중복을 안정적으로 식별하지 못했습니다.
 - 따라서 현재 유지할 조합은 **고신뢰 레코드 연결 + mean_working 보정 + 0.01 snapping**이며, 최고 Public 제출은 alpha=0.930의 0.1255266667입니다.
 
 ### 선택 실험 의존성
