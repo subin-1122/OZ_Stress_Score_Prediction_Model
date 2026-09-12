@@ -41,7 +41,8 @@ stress_predic_DACON/
 │   ├── experiment_v25_mae_aware_linkage.py
 │   ├── experiment_v26_structured_work_residual.py
 │   ├── experiment_v27_missingness_residual.py
-│   └── experiment_v28_corruption_pattern_linkage.py
+│   ├── experiment_v28_corruption_pattern_linkage.py
+│   └── experiment_v29_uncertainty_aware_forest.py
 ├── open (3)/                  # DACON 데이터, Git 제외
 ├── outputs/                   # 예측값과 제출 파일, Git 제외
 ├── requirements.txt
@@ -124,6 +125,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 | v26 | 구조화된 mean_working 잔차 보정 | 고정 비교 최선 0.1183007 | 미제출 | 3승 2패, nested 3승 22패로 기각 |
 | v27 | 결측 signature 계층 보정 | 평균 0.1184300 | 미제출 | 0승 5무 20패로 기각 |
 | v28 | corruption-pattern likelihood 연결 | 평균 0.1185175 | 미제출 | 7승 2무 16패로 기각 |
+| v29 | ExtraTrees uncertainty-aware 보정 | 평균 0.1185431 | 미제출 | 0승 22무 103패로 기각 |
 
 ### OOF와 Public의 차이
 
@@ -160,6 +162,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 - `experiment_v26_structured_work_residual.py`: 근로시간 local smoothing과 예측구간 계층 보정을 안팎 교차검증으로 비교
 - `experiment_v27_missingness_residual.py`: 4개 결측 열의 개수·signature별 shrinkage 잔차 보정을 안팎 교차검증으로 비교
 - `experiment_v28_corruption_pattern_linkage.py`: 고신뢰 중복쌍의 열별·공동 변형 확률비로 확장 후보를 연결하고 nested calibration으로 검증
+- `experiment_v29_uncertainty_aware_forest.py`: 5개 forest seed의 트리 분포 비대칭·불확실성으로 행별 보정 범위를 선택
 
 ## 누수 방지 원칙
 
@@ -197,6 +200,7 @@ Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 �
 - 근로시간 local smoothing과 `mean_working × 예측구간` 계층 보정의 100-fold 고정 비교 최선은 평균 0.000098 개선에 그쳤고 3승 2패였습니다. 방식과 강도를 fold 밖에서 고른 nested 검증에서는 평균 0.0004115 악화하고 3승 22패여서 선택 편향으로 판단했습니다.
 - 결측 개수·4-bit signature 보정은 100-fold 고정 비교 최선도 평균 0.0000587 악화했습니다. nested 검증에서는 평균 0.0000313 악화, 0승 5무 20패였고 250개 outer fold 중 no-op이 223번 선택되어 결측 패턴 신호를 기각했습니다.
 - corruption-pattern likelihood는 fold마다 약 584~624개 고신뢰 positive 쌍으로 열별·공동 equality 패턴을 학습했지만, nested calibration 결과 평균 0.0001188 악화하고 7승 2무 16패였습니다. 실제 변경은 평균 3.7행뿐이어서 확장 후보에서 새 중복을 안정적으로 식별하지 못했습니다.
+- ExtraTrees 트리 분포의 중앙값·40/60% 분위·IQR을 이용한 고정 규칙 최선도 평균 0.0000349 악화하고 10승 15패였습니다. 행별 적용 규칙을 fold 밖에서 고른 nested 검증은 평균 0.0001444 악화, 0승 22무 103패여서 불확실성이 보정 방향을 제공하지 못한다고 판단했습니다.
 - 따라서 현재 유지할 조합은 **고신뢰 레코드 연결 + mean_working 보정 + 0.01 snapping**이며, 최고 Public 제출은 alpha=0.930의 0.1255266667입니다.
 
 ### 선택 실험 의존성
