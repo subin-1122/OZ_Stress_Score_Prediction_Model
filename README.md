@@ -38,7 +38,8 @@ stress_predic_DACON/
 │   ├── experiment_v22_symbolic_residual.py
 │   ├── experiment_v23_pure_extratrees_snap.py
 │   ├── experiment_v24_nested_simplex_stacking.py
-│   └── experiment_v25_mae_aware_linkage.py
+│   ├── experiment_v25_mae_aware_linkage.py
+│   └── experiment_v26_structured_work_residual.py
 ├── open (3)/                  # DACON 데이터, Git 제외
 ├── outputs/                   # 예측값과 제출 파일, Git 제외
 ├── requirements.txt
@@ -118,6 +119,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 | v23 | 순수 3-seed ExtraTrees + snap | 0.1221033 | 0.12956 | 연결 제거 시 실제 성능 악화 확인 |
 | v24 | 10개 OOF 후보 nested simplex stacking | 최선 0.1184800 | 미제출 | 5/5 seed 악화로 기각 |
 | v25 | MAE-aware pair ranking + nested gate | 평균 0.1184536 | 미제출 | 4승 2무 19패로 기각 |
+| v26 | 구조화된 mean_working 잔차 보정 | 고정 비교 최선 0.1183007 | 미제출 | 3승 2패, nested 3승 22패로 기각 |
 
 ### OOF와 Public의 차이
 
@@ -151,6 +153,7 @@ outputs/experimental_alpha093_link_snap_metrics.json
 - `experiment_v23_pure_extratrees_snap.py`: 연결·잔차 보정을 제거한 순수 ExtraTrees 진단 제출 재현
 - `experiment_v24_nested_simplex_stacking.py`: 기존 10개 OOF 예측을 train-only nested CV에서 비음수·합 1 가중치로 스태킹
 - `experiment_v25_mae_aware_linkage.py`: 확장 후보의 복사 MAE를 직접 예측하고 별도 nested gate로 적용 여부를 검증
+- `experiment_v26_structured_work_residual.py`: 근로시간 local smoothing과 예측구간 계층 보정을 안팎 교차검증으로 비교
 
 ## 누수 방지 원칙
 
@@ -185,6 +188,7 @@ Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 �
 - 기존 10개 모델 OOF를 한꺼번에 결합한 nested simplex stacking은 base 모델 비중을 최소 90%로 제한한 가장 보수적 조합도 OOF 0.1184800으로 기존보다 0.0000813 나빴고, 5개 연결 seed가 모두 악화해 기각했습니다.
 - MAE-aware 연결은 후보 쌍을 318,810개에서 995,536개로 넓혔지만, 학습된 top-1 후보를 그대로 사용하면 평균 OOF가 0.04177 악화했습니다. 별도 nested gate도 평균 0.0000549 악화했고 25회 반복에서 4승 2무 19패여서 기각했습니다.
 - v25의 oracle 상한이 0.11823으로 크게 나온 것은 행당 평균 약 536개 후보와 101개뿐인 target 격자 때문에 같은 점수가 우연히 후보군에 포함된 결과입니다. 이 값은 실제로 식별 가능한 연결 신호가 아니므로 모델 채택 근거로 사용하지 않습니다.
+- 근로시간 local smoothing과 `mean_working × 예측구간` 계층 보정의 100-fold 고정 비교 최선은 평균 0.000098 개선에 그쳤고 3승 2패였습니다. 방식과 강도를 fold 밖에서 고른 nested 검증에서는 평균 0.0004115 악화하고 3승 22패여서 선택 편향으로 판단했습니다.
 - 따라서 현재 유지할 조합은 **고신뢰 레코드 연결 + mean_working 보정 + 0.01 snapping**이며, 최고 Public 제출은 alpha=0.930의 0.1255266667입니다.
 
 ### 선택 실험 의존성
