@@ -33,11 +33,14 @@ stress_predic_DACON/
 │   ├── experiment_v18_gam_full_pipeline_eval.py
 │   ├── experiment_v18b_gam_layer_diagnostic.py
 │   ├── experiment_v19_deterministic_union_audit.py
-│   └── experiment_v20_gam_work_alpha.py
+│   ├── experiment_v20_gam_work_alpha.py
+│   ├── experiment_v21_distributional_median.py
+│   └── experiment_v22_symbolic_residual.py
 ├── open (3)/                  # DACON 데이터, Git 제외
 ├── outputs/                   # 예측값과 제출 파일, Git 제외
 ├── requirements.txt
 ├── requirements-tabpfn.txt    # TabPFN 선택 설치 환경
+├── requirements-symbolic.txt  # gplearn 선택 설치 환경
 └── .vscode/settings.json
 ```
 
@@ -106,7 +109,9 @@ outputs/experimental_alpha093_link_snap_metrics.json
 | v16~v17 | Quantile GAM, 독립 seed 재검증 | 최대 약 0.00120 개선 | 미제출 | 예비 검증 통과 |
 | v18~v20 | GAM을 전체 파이프라인에 결합 | 최선 약 0.11850 | 미제출 | 기존 0.11840보다 악화 |
 | v19 | deterministic union 보수적 규칙 | 최대 약 0.000085 개선 | 미제출 | 사전 기준 0.0001 미달 |
-| v15 | TabPFN 회귀 | 실행 대기 | 미제출 | 로컬 라이선스 인증 필요 |
+| v15 | TabPFN 회귀 | 미실행 | 미제출 | 사용자 결정으로 중단 |
+| v21 | Ordinal 중앙값·forest proximity | 최선 약 0.000080 개선 | 미제출 | 기준 미달 및 seed 불안정 |
+| v22 | gplearn symbolic 잔차 보정 | 최소 0.000231 악화 | 미제출 | 5/5 seed 악화 |
 
 ### OOF와 Public의 차이
 
@@ -135,6 +140,8 @@ outputs/experimental_alpha093_link_snap_metrics.json
 - `experiment_v18b_gam_layer_diagnostic.py`: GAM 효과가 어느 보정 단계에서 사라지는지 분리 진단
 - `experiment_v19_deterministic_union_audit.py`: deterministic 연결 규칙을 더 엄격하게 재검증
 - `experiment_v20_gam_work_alpha.py`: GAM 결합 후 mean_working alpha를 0.00~1.00으로 재탐색
+- `experiment_v21_distributional_median.py`: 101-class 조건부 중앙값과 forest-proximity 중앙값 선별
+- `experiment_v22_symbolic_residual.py`: 미연결 행의 post-mean_working 잔차를 symbolic 식으로 보정
 
 ## 누수 방지 원칙
 
@@ -161,16 +168,18 @@ Public 결과만 보고 `alpha=0.950`, `0.970`, `1.000`을 순차 탐색하는 �
 - GAM은 raw unlinked 예측에서 0.002029 개선했지만, `mean_working` 보정 뒤에는 0.0001929 악화했습니다. 두 방법이 같은 잔차 신호를 겹쳐 고친다는 근거입니다.
 - GAM 결합 상태에서 `mean_working` alpha를 다시 찾은 최선은 0.65였지만 OOF 0.1185007로, 기존 0.1183987보다 0.000102 나빴습니다.
 - 더 엄격한 deterministic 연결은 learned-only 기준 최대 약 0.0000847 개선했지만 사전 채택 기준 0.0001에 못 미쳤고, 현재 규칙보다 실질 개선은 약 0.0000033뿐이었습니다.
+- ID 인접성은 바로 옆 ID의 target 차이가 0.3349로 무작위 쌍의 0.3324보다 낫지 않았고, train-test 동일 번호의 feature 일치 수도 무작위와 차이가 없어서 blocking에 사용하지 않았습니다.
+- 101-class 조건부 중앙값의 최선은 평균 0.000080 개선에 그쳤고 4승 1패였습니다. forest-proximity 중앙값은 최선 조합도 평균 0.000124 악화했습니다.
+- gplearn 잔차 보정은 가장 약한 alpha=0.25에서도 평균 0.000231 악화했고 5개 연결 seed가 모두 악화했습니다. fold별 수식도 대부분 상수 또는 단일 항으로 수렴했습니다.
 - 따라서 현재 유지할 조합은 **고신뢰 레코드 연결 + mean_working 보정 + 0.01 snapping**이며, 최고 Public 제출은 alpha=0.930의 0.1255266667입니다.
 
-### TabPFN 실행 방법
+### 선택 실험 의존성
 
-TabPFN 코드는 준비했지만 Prior Labs의 무료 라이선스 동의와 개인 API 토큰이 필요해 자동 실행하지 않았습니다. 토큰은 Git이나 코드에 저장하지 말고 현재 터미널의 환경변수로만 전달합니다.
+TabPFN은 더 진행하지 않기로 결정해 실행 대상에서 제외했습니다. symbolic 실험을 재현할 때만 별도 의존성을 설치합니다.
 
 ```bash
-python -m pip install -r requirements-tabpfn.txt
-export TABPFN_TOKEN="<본인의 Prior Labs 토큰>"
-.venv/bin/python experiment/experiment_v15_tabpfn_regression.py
+python -m pip install -r requirements-symbolic.txt
+.venv/bin/python experiment/experiment_v22_symbolic_residual.py
 ```
 
-TabPFN도 동일하게 train fold에서만 전처리를 학습하고 held-out fold로 검증하도록 작성했습니다.
+v21과 v22 모두 test.csv를 읽지 않고 train-only OOF로만 판단하며 제출 파일을 만들지 않습니다.
