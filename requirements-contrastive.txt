@@ -1,0 +1,3 @@
+# v30 supervised contrastive linkage 실험용 추가 의존성
+-r requirements.txt
+torch>=2.0
