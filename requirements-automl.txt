@@ -1,0 +1,3 @@
+# v43 FLAML 광역 탐색 실험용 의존성
+-r requirements.txt
+flaml[automl]==2.6.0
