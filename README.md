@@ -1,153 +1,53 @@
-# v5 재현 스크립트 사용법 — `code/reproduce_v5.py`
+# 데이콘 스트레스 지수 예측 대회
 
-대회: DACON [초격차] AI 헬스케어 6기 해커톤 · 팀 `프린트("4조")`
-저장소: https://github.com/subin-1122/OZ_Stress_Score_Prediction_Model
-작성일: 2026-09-17
+- **Public MAE 1위: 0.12264**
+- 대회: DACON [초격차] AI 헬스케어 6기 해커톤
+- 팀: `프린트("4조")`
+- 저장소: [OZ_Stress_Score_Prediction_Model](https://github.com/subin-1122/OZ_Stress_Score_Prediction_Model)
+- 작성일: 2026-09-17
 
----
+최종 제출 모델은 [`code/reproduce_v5.py`](code/reproduce_v5.py)이며,
+`train.csv`, `test.csv`, `sample_submission.csv`로 `v5.csv`를 재현할 수 있습니다.
 
-## 0. 한 줄 요약
+상세한 모델 설명과 실행 결과는 [`code/README.md`](code/README.md)에서 확인할 수 있습니다.
 
-`train.csv` · `test.csv` · `sample_submission.csv` 세 파일만 있으면
-**개체 복원 → 우도·사전분포 추정 → 사후 중앙값 → `v5.csv`** 까지 한 번에 재현됩니다.
+## 1. 환경 설정
 
----
-
-## 1. 실행 방법
+필요한 패키지를 설치합니다.
 
 ```bash
-# 의존성
 pip install numpy pandas scikit-learn
-
-# 실행 (code/ 폴더에서)
-cd code
-python reproduce_v5.py --data ../open
-
-# 데이터 폴더가 ../data, ./data, ./open 중 하나면 --data 생략 가능
-python reproduce_v5.py
-
-# 출력 폴더 지정
-python reproduce_v5.py --data ../open --out ../submissions
 ```
 
-### 입력
+저장소 루트에서 다음과 같이 실행합니다.
 
-| 파일 | 위치 | 비고 |
-|---|---|---|
-| `train.csv` | `--data` 폴더 | 3,000행 · stress_score 포함 |
-| `test.csv` | `--data` 폴더 | 3,000행 |
-| `sample_submission.csv` | `--data` 폴더 | 제출 ID 순서의 기준 |
-
-### 출력
-
-| 파일 | 내용 |
-|---|---|
-| `<out>/all_matched.csv` | 개체 복원 결과 6,000행 (`ID` · `src` · `partner` · `partner_ID`) |
-| `<out>/v5.csv` | 제출 파일 3,000행 |
-
-`all_matched.csv` 의 `partner` 는 `concat(train, test)` 기준 행 인덱스이며,
-짝이 없으면 `-1` 입니다. `verify.py` 가 참조하는 형식과 동일합니다.
-
----
-
-## 2. 재현 검증 결과
-
-컨테이너에서 실제로 실행해 기존 `submissions/v5.csv` 와 대조한 결과입니다.
-
-```
-train 3000행 · test 3000행 로드
-all_matched.csv 저장 · 짝을 찾은 행 6000 / 6000
-개체 3000개 | Z=0 774 / Z=1 1452 / Z=2 774
-train 내부 쌍 774쌍 · 타깃 일치율 1.0000
-우도표 6종 · 사전분포 1종 · 부호 우도표 1종 학습 완료
-v5.csv 저장 · 3000행 · 평균 0.5291 · 고유값 101개
+```bash
+python code/reproduce_v5.py --data ./open --out ./submissions
 ```
 
-**원본 `v5.csv` 와 3,000행 중 0행 차이 (완전 일치)**
+`--data`로 지정하는 폴더에는 다음 파일이 있어야 합니다.
 
-> 이 스크립트는 새로 작성한 것이 아니라 `code/build_all.py` 의 v5 경로를
-> 그대로 가져와 단독 실행이 가능하도록 정리한 것입니다. 임의 재구성이 아닙니다.
+- `train.csv`
+- `test.csv`
+- `sample_submission.csv`
 
----
+실행이 완료되면 `submissions/v5.csv`와 `submissions/all_matched.csv`가 생성됩니다.
 
-## 3. 스크립트가 하는 일 (5단계)
+## 2. 폴더 구조
 
-### ① 적재 — 전처리 없음
-
-인코딩 · 스케일링 · 결측치 대치를 **전부 하지 않고 원시값을 그대로** 씁니다.
-확률 모형에서 결측은 "해당 우도항을 생략"하는 것으로 정확히 처리되므로,
-대치는 오히려 관측되지 않은 정보를 만들어 내는 일이 됩니다.
-
-> 대조 실험: 결측을 중앙값으로 채우면 CV MAE 0.23640 → 0.23733 으로 악화 (SE 0.00118)
-
-### ② 개체 복원 (Record Linkage) → `all_matched.csv`
-
-train 3,000 + test 3,000 = 6,000행은 실제로는 **3,000명이 두 번씩 기록된 자료**입니다.
-
-- 수치형 8개를 실측 미세오차 `TOL` 로 스케일링한 뒤 체비셰프 반경 탐색
-- 범주형 7개는 **완전 일치**해야 후보로 인정
-- 거리가 가까운 쌍부터 1:1 로 확정 (greedy)
-
-결과적으로 개체는 세 종류로 나뉩니다.
-
-| 유형 | 표기 | 개체 수 | test 행 | 의미 |
-|---|---|---|---|---|
-| 둘 다 train | Z = 2 | 774 | 0 | 우도·사전분포 학습 재료 |
-| train 1 + test 1 | Z = 1 | 1,452 | 1,452 | 짝의 정답을 그대로 복사 → 오차 0 |
-| 둘 다 test | Z = 0 | 774 | 1,548 | **실제 예측 대상** |
-
-→ 3,000행 중 **1,548행만 모형으로 추정**하면 됩니다.
-→ `LB MAE = 0.516 × 모델 MAE` (개선분이 리더보드에서 절반으로 희석되는 이유)
-
-### ③ 표 3종 학습 — test 레코드 일절 미사용
-
-흔히 말하는 머신러닝 모델이 없습니다. 학습되는 것은 도수표 3종뿐입니다.
-
-| 표 | 크기 | 학습 재료 |
-|---|---|---|
-| 우도표 `P(mean_working \| y)` | 101 × 13 | train 레코드 1,968개 |
-| 사전분포 `P(y \| Z=0)` | 101칸 | train 라벨 (Z 판정도 train 내부 쌍 유무로) |
-| 부호 우도표 `P(sign(Δdbp) \| y)` | 101 × 3 | train 내부 중복쌍 774개 |
-
-- 우도표는 커널폭 3종(`H_LIST`) × 평활 2종(`PK_LIST`) = **6조합을 평균**합니다.
-- 분포의 함수 형태를 가정하지 않는 **비모수(nonparametric)** 추정입니다.
-  정규분포를 가정했을 때는 CV 0.24544 였고, 실측 모양을 그대로 쓰자 0.23850 이 되었습니다.
-- 사전분포는 분할 편향 보정입니다. `p(y) = 0.5 + c(y − 0.5)` 로 두고
-  두 기록이 모두 test 에 남을 확률 `(1 − p)²` 를 쓰며, 미러 KDE 와 평균합니다.
-
-### ④ 추론 — 로그 합산 → 정규화 → 누적 0.5
-
-```
-log P(y | 관측) = τ_L·log P(mw_a | y) + τ_L·log P(mw_b | y)
-                + log P(y | Z=0)
-                + τ_S·log P(sign Δdbp | y)
+```text
+OZ_Stress_Score_Prediction_Model/
+├── README.md
+├── code/
+│   ├── README.md
+│   └── reproduce_v5.py
+├── submissions/
+│   ├── README.md
+│   ├── v5.csv             # 실행 후 생성
+│   └── all_matched.csv    # 실행 후 생성
+├── verify.py
+├── v5.csv                 # 최종 제출 파일
+└── 스트레스 지수 예측 AI 해커톤 발표.pptx
 ```
 
-작은 확률을 여러 개 곱하면 언더플로가 나므로 로그로 더합니다.
-정규화한 뒤 **누적확률이 0.5 를 넘는 첫 지점(사후 중앙값)** 을 예측값으로 씁니다.
-MAE 를 최소화하는 점추정량이 평균이 아니라 중앙값이기 때문입니다.
-
-### ⑤ 후처리
-
-- Z = 1 인 1,452행은 짝의 정답을 그대로 복사
-- `sample_submission` 의 ID 순서로 정렬
-- 0.01 격자로 반올림, `[0, 1]` 범위 및 결측 없음 assert
-
----
-
-## 4. 하이퍼파라미터 (파일 상단에 모여 있음)
-
-| 이름 | 값 | 의미 |
-|---|---|---|
-| `TAU_L` | 1.00 | mean_working 우도 가중 |
-| `TAU_S` | 0.60 | sign(Δ이완기혈압) 우도 가중 |
-| `PRIOR_W` | 1.0 | 사전분포 가중 |
-| `H_LIST` | 0.04 / 0.06 / 0.09 | 우도 커널폭 (3종 앙상블) |
-| `PK_LIST` | 0.2 / 0.5 | 라플라스 평활 상수 (2종 앙상블) |
-| `KDE_H` | 0.25 | 사전분포용 커널폭 |
-| `SIGN_H` · `SIGN_PK` | 0.25 · 2.0 | 부호 우도표 커널폭 · 평활 |
-| `TOL` | age ±1.0, height ±0.2, … | 매칭 허용오차 (실측 미세오차 폭) |
-| `MULT` | 8 | 후보 탐색 반경 배수 |
-
-학습되는 표의 칸 값은 약 8,600개, 사람이 정하는 값은 위 7종입니다.
-
+대회 데이터는 저장소에 포함하지 않습니다. 로컬의 `open/` 폴더 등에 별도로 배치해 실행합니다.
